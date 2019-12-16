@@ -39,7 +39,7 @@ import qualified Data.ByteString.Internal as BS (c2w, w2c)
 import qualified Data.Set as Set
 
 type IJ = Int -- (Int, Int) packed into one Int
-type PathElement = (Char, IJ)
+type PathElement = (Word8, IJ)
 type Neighbors = [PathElement]
 type BitSet = Word -- BitSet used as Bits BitSet
 type Path = ([PathElement], BitSet)
@@ -71,7 +71,7 @@ type Scorer = Int -> Int -- length to score
 data Boggle = Boggle {
     board :: Board,
     scorer :: Scorer,
-    get :: IJ -> Char,
+    get :: IJ -> Word8,
     toNeighbors :: [IJ] -> Neighbors,
     startingPathSet :: BitSet,
     startingNeighborIndices :: [IJ],
@@ -110,8 +110,8 @@ newWithScorer scorer board = Boggle {
     toIJ :: (Int, Int) -> IJ
     toIJ (i, j) = i * n + j
     
-    get :: IJ -> Char
-    get ij = BS.index boardArray ij & BS.w2c
+    get :: IJ -> Word8
+    get ij = BS.index boardArray ij
     
     toNeighbors :: [IJ] -> Neighbors
     toNeighbors = map (\ij -> (get ij, ij))
@@ -152,7 +152,7 @@ newWithScorer scorer board = Boggle {
         searchNeighbor :: PathElement -> [Path]
         searchNeighbor pathElem@(c, ij) = currentPath ++ subPaths
           where
-            (found, maybeSubDict) = Dict.startingWith (BS.singleton $ BS.c2w $ c) subDict
+            (found, maybeSubDict) = Dict.startingWith (BS.singleton c) subDict
             
             currentPath :: [Path]
             currentPath = found
@@ -174,7 +174,7 @@ newWithScorer scorer board = Boggle {
     toFoundWord :: Path -> FoundWord
     toFoundWord (combinedPath, pathSet) = FoundWord {word, pathSet, path, score}
       where
-        word = combinedPath & map fst & map BS.c2w & BS.pack
+        word = combinedPath & map fst & BS.pack
         path = combinedPath & map snd
         score = scorer $ BS.length word
     
