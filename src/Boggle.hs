@@ -9,7 +9,8 @@ module Boggle (
     FoundWord,
     Solution,
     new,
-    solve
+    solve,
+    totalScore
 ) where
 
 import Board (Board(..))
@@ -42,7 +43,7 @@ type PathElement = (Char, IJ)
 type Neighbors = [PathElement]
 type BitSet = Integer -- Integer used as Bits Integer
 type Path = ([PathElement], BitSet)
-type PathDictElement = (PathElement, Dictionary)
+type PathDictElement = (PathElement, BitSet, Dictionary)
 
 data FoundWord = FoundWord {
     score :: Int,
@@ -77,7 +78,7 @@ data Boggle = Boggle {
     startingNeighbors :: Neighbors,
     neighborIndices :: IJ -> [IJ],
     neighbors :: IJ -> Neighbors,
-    searchNeighbors :: Dictionary -> Neighbors -> [Path],
+    searchIndices :: Dictionary -> BitSet -> [IJ] -> [Path],
     searchFrom :: PathDictElement -> [Path],
     toFoundWord :: Path -> FoundWord,
     solve :: Dictionary -> Solution
@@ -94,7 +95,7 @@ newWithScorer scorer board = Boggle {
     startingNeighbors = toNeighbors $ startingNeighborIndices,
     neighborIndices,
     neighbors = toNeighbors . neighborIndices,
-    searchNeighbors,
+    searchIndices,
     searchFrom,
     toFoundWord,
     solve
@@ -141,36 +142,9 @@ newWithScorer scorer board = Boggle {
       where
         (i, j) = fromIJ ij
     
-    searchNeighbors :: Dictionary -> Neighbors -> [Path]
-    searchNeighbors subDict neighbors = neighbors
-        & map searchNeighbor
-        & concat
-      where
-        searchNeighbor :: PathElement -> [Path]
-        searchNeighbor pathElem@(c, ij) = currentPath ++ subPaths
-          where
-            (found, maybeSubDict) = Dict.startingWith (BS.singleton $ BS.c2w $ c) subDict
-            
-            currentPath :: [Path]
-            currentPath = found
-                <&> const ([pathElem], bit ij)
-                & maybeToList
-            
-            subPaths :: [Path]
-            subPaths = maybeSubDict
-                <&> (pathElem, )
-                <&> searchFrom
-                & fromMaybe []
-            
-    searchFrom :: PathDictElement -> [Path]
-    searchFrom ((c, ij), pathSet, subDict) = ij
-        & neighborIndices
-        & searchIndices subDict pathSet
-        & map (\(path, pathSet) -> ((c, ij) : path, pathSet `setBit` ij))
-    
-    searchIndices :: Dictionary -> BitSet -> [IJ]
+    searchIndices :: Dictionary -> BitSet -> [IJ] -> [Path]
     searchIndices subDict pathSet indices = indices
-        & filter (pathSet `testBit`)
+        & filter (not . (pathSet `testBit`))
         & toNeighbors
         & map searchNeighbor
         & concat
@@ -182,7 +156,7 @@ newWithScorer scorer board = Boggle {
             
             currentPath :: [Path]
             currentPath = found
-                <&> const ([pathElem], bit ij)
+                <&> const ([pathElem], pathSet)
                 & maybeToList
             
             subPaths :: [Path]
@@ -190,6 +164,12 @@ newWithScorer scorer board = Boggle {
                 <&> (pathElem, pathSet `setBit` ij, )
                 <&> searchFrom
                 & fromMaybe []
+    
+    searchFrom :: PathDictElement -> [Path]
+    searchFrom ((c, ij), pathSet, subDict) = ij
+        & neighborIndices
+        & searchIndices subDict pathSet
+        & map (\(path, pathSet) -> ((c, ij) : path, pathSet)) -- TODO simplify
     
     toFoundWord :: Path -> FoundWord
     toFoundWord (combinedPath, pathSet) = FoundWord {word, pathSet, path, score}
@@ -241,14 +221,14 @@ instance Show PrettyFoundWords where
 
 data PrettySolution = PrettySolution {
     words :: PrettyFoundWords,
-    totalScore :: Int,
+    totalScore_ :: Int,
     board :: Board
 } deriving Show
 
 prettySolution :: Solution -> PrettySolution
 prettySolution Solution {words, totalScore, board} = PrettySolution {
     words = words & map convert & PrettyFoundWords,
-    totalScore,
+    totalScore_ = totalScore,
     board
 }
   where
