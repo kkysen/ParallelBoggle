@@ -38,6 +38,9 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     - -O2
+    - -fprof-auto
+    - -fprof-cafs
+    - -fforce-recomp
     dependencies:
     - ParallelBoggle
 

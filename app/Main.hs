@@ -29,12 +29,24 @@ main :: IO ()
 main = do
     dict <- Dict.fromFile "data/sowpods.txt"
     args <- getArgs
-    args
-        & map BSC.pack
-        & Board.fromList
-        & fromJust
-        & Boggle.new
-        & (`Boggle.solve` dict)
-        & Boggle.totalScore
-        & print
+    let (board, score) = solve dict args
+    print board
+    print score
+  where
+    
+    grow :: Word -> [String] -> [String]
+    grow 0 args = args
+    grow n args = (args ++ args) & map (\s -> s ++ s) & grow (n - 1)
+    
+    solve dict args = (board, score)
+      where
+        board = args
+            & grow 3
+            & map BSC.pack
+            & Board.fromList
+            & fromJust
+        score = board
+            & Boggle.new
+            & (`Boggle.solve` dict)
+            & Boggle.totalScore
     

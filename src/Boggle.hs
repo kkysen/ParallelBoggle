@@ -37,7 +37,6 @@ import Data.Word (Word8)
 import Debug.Trace
 
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Internal as BS (c2w, w2c)
 import qualified Data.Set as Set
 
 type IJ = Int -- (Int, Int) packed into one Int

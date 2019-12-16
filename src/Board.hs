@@ -49,9 +49,11 @@ unwrap :: Maybe Board -> Board
 unwrap = fromJust
 
 instance Show Board where
-    show Board {board, size = (m, n)} = [0..(m - 1)]
-        & map (* n)
-        & map (\start -> (BS.take n . BS.drop start) board)
-        & List.intersperse (BSC.singleton '\n')
-        & BS.concat
-        & BSC.unpack
+    show Board {board, size = (m, n)} = show (m, n) ++ "\n" ++ boardString
+      where
+        boardString = [0..(m - 1)]
+            & map (* n)
+            & map (\start -> (BS.take n . BS.drop start) board)
+            & List.intersperse (BSC.singleton '\n')
+            & BS.concat
+            & BSC.unpack
