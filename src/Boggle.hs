@@ -1,9 +1,11 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE UnboxedTuples #-}
 
 module Boggle (
     FoundWord,
@@ -20,7 +22,7 @@ import qualified Board
 import qualified Dictionary as Dict
 
 import Control.Monad (guard)
-import Data.Bits (Bits, bit, setBit, testBit, bitSizeMaybe)
+import Data.Bits (Bits, bit, setBit, testBit, bitSizeMaybe, shiftL, shiftR, (.&.), (.|.))
 import Data.ByteString (ByteString)
 import Data.Function ((&))
 import Data.Functor ((<&>))
@@ -39,7 +41,7 @@ import qualified Data.ByteString.Internal as BS (c2w, w2c)
 import qualified Data.Set as Set
 
 type IJ = Int -- (Int, Int) packed into one Int
-type PathElement = (Word8, IJ)
+type PathElement = Int -- (Word8, IJ) packed into one Int
 type Neighbors = [PathElement]
 type BitSet = Word -- BitSet used as Bits BitSet
 type Path = ([PathElement], BitSet)
@@ -108,13 +110,19 @@ newWithScorer scorer board = Boggle {
     fromIJ = (`divMod` m)
     
     toIJ :: (Int, Int) -> IJ
-    toIJ (i, j) = i * n + j
+    toIJ (!i, !j) = i * n + j
     
     get :: IJ -> Word8
     get ij = BS.index boardArray ij
     
+    fromPathElement :: PathElement -> (Word8, IJ)
+    fromPathElement e = (fromIntegral e .&. 0xFF, e `shiftR` 8)
+    
+    toPathElement :: (Word8, IJ) -> PathElement
+    toPathElement (!c, !ij) = fromIntegral c .|. ij `shiftL` 8
+    
     toNeighbors :: [IJ] -> Neighbors
-    toNeighbors = map (\ij -> (get ij, ij))
+    toNeighbors = map (\ij -> toPathElement (get ij, ij))
     
     startingPathSet :: BitSet
     startingPathSet = 0
@@ -136,11 +144,11 @@ newWithScorer scorer board = Boggle {
     
     neighborIndices :: IJ -> [IJ]
     neighborIndices ij = indices
-        & map (\(x, y) -> (i + x, j + y))
-        & filter (\(i, j) -> i >= 0 && i < m && j >= 0 && j < n)
+        & map (\(!x, !y) -> (i + x, j + y))
+        & filter (\(!i, !j) -> i >= 0 && i < m && j >= 0 && j < n)
         & map toIJ
       where
-        (i, j) = fromIJ ij
+        (!i, !j) = fromIJ ij
     
     searchIndices :: Dictionary -> BitSet -> [IJ] -> [Path]
     searchIndices subDict pathSet indices = indices
@@ -150,8 +158,9 @@ newWithScorer scorer board = Boggle {
         & concat
       where
         searchNeighbor :: PathElement -> [Path]
-        searchNeighbor pathElem@(c, ij) = currentPath ++ subPaths
+        searchNeighbor pathElem = currentPath ++ subPaths
           where
+            (!c, !ij) = fromPathElement pathElem
             (found, maybeSubDict) = Dict.startingWith (BS.singleton c) subDict
             
             currentPath :: [Path]
@@ -166,16 +175,19 @@ newWithScorer scorer board = Boggle {
                 & fromMaybe []
     
     searchFrom :: PathDictElement -> [Path]
-    searchFrom ((c, ij), pathSet, subDict) = ij
+    searchFrom (!pathElem, !pathSet, !subDict) = ij
         & neighborIndices
         & searchIndices subDict pathSet
-        & map (\(path, pathSet) -> ((c, ij) : path, pathSet)) -- TODO simplify
+        & map (\(!path, !pathSet) -> (pathElem : path, pathSet)) -- TODO simplify
+      where
+        (!c, !ij) = fromPathElement pathElem
     
     toFoundWord :: Path -> FoundWord
-    toFoundWord (combinedPath, pathSet) = FoundWord {word, pathSet, path, score}
+    toFoundWord (!combinedPath, !pathSet) = FoundWord {word, pathSet, path, score}
       where
-        word = combinedPath & map fst & BS.pack
-        path = combinedPath & map snd
+        unPackedPath = combinedPath & map fromPathElement
+        word = unPackedPath & map fst & BS.pack
+        path = unPackedPath & map snd
         score = scorer $ BS.length word
     
     solve dict = Solution {words, totalScore, board}
