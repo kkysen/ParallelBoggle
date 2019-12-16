@@ -41,7 +41,7 @@ import qualified Data.Set as Set
 type IJ = Int -- (Int, Int) packed into one Int
 type PathElement = (Char, IJ)
 type Neighbors = [PathElement]
-type BitSet = Integer -- Integer used as Bits Integer
+type BitSet = Word -- BitSet used as Bits BitSet
 type Path = ([PathElement], BitSet)
 type PathDictElement = (PathElement, BitSet, Dictionary)
 
