@@ -3,7 +3,14 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/lock_files
 
-packages: []
+packages:
+- completed:
+    hackage: bytestring-trie-0.2.5.0@sha256:96498959cf2af0e3f1f3dfb526b78502c9fa8f21255a3506938ee2a26e61d653,3331
+    pantry-tree:
+      size: 705
+      sha256: dfcfade8cc0eaafae73ef31de6ecfa5c348bbd3a8d514dda8c9e7cef74e41b87
+  original:
+    hackage: bytestring-trie-0.2.5.0@sha256:96498959cf2af0e3f1f3dfb526b78502c9fa8f21255a3506938ee2a26e61d653,3331
 snapshots:
 - completed:
     size: 524104

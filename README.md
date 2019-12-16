@@ -1,1 +1,1 @@
-# ParallelBoggle
+# Parallel Boggle
