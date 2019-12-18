@@ -51,24 +51,30 @@ instance SA.State BoggleState where
     
     energy = fromIntegral . negate . score
     
-    perturb stepSize s@BoggleState {boggle, lang, count} = do
-        let board = Boggle.board boggle
-        let (m, n) = Board.size board
-        let size = m * n
-        swapOrReplace <- getRandom
-        ij <- getRandomR (0, size - 1)
-        modify <- case swapOrReplace of
-            True -> do
-                c <- Lang.randomLetter lang
-                return $ Board.replaceLetter ij c
-            False -> do
-                ij' <- getRandomR (0, size - 1)
-                return $ Board.swapLetters ij ij'
-        let s' = s {
-            boggle = Boggle.new $ modify board,
-            count = count + 1
-        }
-        return $ s'
+    perturb stepSize s = multiple (ceiling stepSize) s
+      where
+        multiple n s
+            | n > 0 = once s >>= multiple (n - 1)
+            | otherwise = return s
+        
+        once s@BoggleState {boggle, lang, count} = do
+            let board = Boggle.board boggle
+            let (m, n) = Board.size board
+            let size = m * n
+            swapOrReplace <- getRandom
+            ij <- getRandomR (0, size - 1)
+            modify <- case swapOrReplace of
+                True -> do
+                    c <- Lang.randomLetter lang
+                    return $ Board.replaceLetter ij c
+                False -> do
+                    ij' <- getRandomR (0, size - 1)
+                    return $ Board.swapLetters ij ij'
+            let s' = s {
+                boggle = Boggle.new $ modify board,
+                count = count + 1
+            }
+            return $ s'
 
 random :: MonadRandom m => Size -> Lang -> m BoggleState
 random size@(m, n) lang = do
@@ -82,15 +88,17 @@ random size@(m, n) lang = do
 optimize :: MonadRandom m => Size -> Lang -> m BoggleState
 optimize size lang = do
     state <- random size lang
+    let (m, n) = size
+    let mn = m * n
     let args = Args {
-        numTries = 200,
-        numItersPerTemp = 1000,
-        maxStepSize = 1.0,
+        numTries = 10,
+        numItersPerTemp = 500,
+        maxStepSize = sqrt $ fromIntegral mn,
         boltzmannK = 1.0,
         coolingTemp = CoolingTemp {
-            initial = 0.008,
-            rate = 1.003,
-            min = 2.0e-6
+            initial = 1.0,
+            rate = 1.05,
+            min = 0.0069 --2.0e-6
         }
     }
     SA.anneal state args (Just $ show . count)
