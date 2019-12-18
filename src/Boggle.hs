@@ -23,6 +23,8 @@ import qualified Board
 import qualified Lang as Dict
 
 import Control.Monad (guard)
+import Control.Monad.Par (runPar)
+import Control.Monad.Par.Combinator (parMap)
 import Control.Parallel.Strategies (using, parList, rseq, rdeepseq)
 import Data.Bits (Bits, bit, setBit, testBit, bitSizeMaybe,
     shiftL, shiftR, (.&.), (.|.), popCount)
@@ -170,14 +172,17 @@ newWithScorer scorer board runInParallel = Boggle {
     searchIndices subDict pathSet indices = indices
         & filter (not . (pathSet `testBit`))
         & toNeighbors
-        & map searchNeighbor
+--         & map searchNeighbor
         & parallelize
         & concat
       where
         pathLength = popCount pathSet
-        parallelize = case pathLength <= 4 of
-            True -> (`using` parList rdeepseq)
-            False -> id
+        parallelize = case pathLength <= 2 of
+            True -> (\a -> parMap searchNeighbor a & runPar)
+            False -> map searchNeighbor
+        
+--         strategies = (`using` parList rdeepseq)
+--         parMonad = runPar . parMap
         
         searchNeighbor :: PathElement -> [Path]
         searchNeighbor pathElem = currentPath ++ subPaths

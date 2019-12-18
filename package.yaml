@@ -33,6 +33,8 @@ dependencies:
 - vector
 - deepseq
 - parallel
+- monad-par
+- monad-par-extras
 
 library:
   source-dirs: src
