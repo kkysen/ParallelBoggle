@@ -1,4 +1,6 @@
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Board (
     Size,
@@ -6,18 +8,27 @@ module Board (
     fromRaw,
     fromSizedList,
     fromList,
-    unwrap
+    replaceLetter,
+    swapLetters
 ) where
+
+import Metric (MetricSpace, metric2)
 
 import Control.Monad (guard)
 import Data.ByteString (ByteString)
 import Data.Function ((&))
 import Data.Maybe (fromJust)
+import Data.Vector.Storable (Vector, Storable, MVector, modify)
+import Data.Vector.Storable.ByteString (byteStringToVector, vectorToByteString)
+import Data.Vector.Storable.Mutable (swap, write)
+import Data.Word (Word8)
+import System.Random (RandomGen, randomRs)
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
 import qualified Data.List as List
 
+type IJ = Int -- compressed two (Int32, Int32)
 type Size = (Int, Int)
 
 data Board = Board {
@@ -45,9 +56,6 @@ fromList rows = fromSizedList size rows
     m = length rows
     n = BS.length $ head rows
 
-unwrap :: Maybe Board -> Board
-unwrap = fromJust
-
 instance Show Board where
     show Board {board, size = (m, n)} = show (m, n) ++ "\n" ++ boardString
       where
@@ -57,3 +65,29 @@ instance Show Board where
             & List.intersperse (BSC.singleton '\n')
             & BS.concat
             & BSC.unpack
+
+instance MetricSpace Board where
+    metric2 Board {board = a} Board {board = b} = BS.zip a b
+          & map (\(x, y) -> (c x, c y))
+          & map (\(x, y) -> x - y)
+          & map (\x -> x * x)
+          & sum
+          & fromIntegral
+        where
+          c :: Word8 -> Int
+          c = fromIntegral
+
+type Map a = a -> a
+
+as :: (a -> b) -> (b -> a) -> Map b -> Map a
+as to from f x = x & to & f & from
+
+bsAsVecs = as byteStringToVector vectorToByteString
+
+boardAsVecs f b@Board {board} = b {board = bsAsVecs f board}
+
+replaceLetter :: IJ -> Word8 -> Map Board
+replaceLetter i c = boardAsVecs $ modify (\v -> write v i c)
+
+swapLetters :: IJ -> IJ -> Map Board
+swapLetters i j = boardAsVecs $ modify (\v -> swap v i j)

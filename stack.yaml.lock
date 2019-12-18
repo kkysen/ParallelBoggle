@@ -11,6 +11,13 @@ packages:
       sha256: dfcfade8cc0eaafae73ef31de6ecfa5c348bbd3a8d514dda8c9e7cef74e41b87
   original:
     hackage: bytestring-trie-0.2.5.0@sha256:96498959cf2af0e3f1f3dfb526b78502c9fa8f21255a3506938ee2a26e61d653,3331
+- completed:
+    hackage: spool-0.1@sha256:77780cbfc2c0be23ff2ea9e474062f3df97fcd9db946ee0b3508280a923b83e2,1461
+    pantry-tree:
+      size: 322
+      sha256: 48eada528a8eda2fcf0d3517a239c59a699acff96111f427833ba2b04bd6111f
+  original:
+    hackage: spool-0.1@sha256:77780cbfc2c0be23ff2ea9e474062f3df97fcd9db946ee0b3508280a923b83e2,1461
 snapshots:
 - completed:
     size: 524104

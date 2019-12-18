@@ -25,6 +25,13 @@ dependencies:
 - bytestring-trie
 - containers
 - interpolate
+- random
+- mmap
+- hmatrix-gsl
+- hmatrix
+- MonadRandom
+- spool
+- vector
 
 library:
   source-dirs: src
@@ -41,6 +48,7 @@ executables:
     - -fprof-auto
     - -fprof-cafs
     - -fforce-recomp
+#    - -fllvm
     dependencies:
     - ParallelBoggle
 

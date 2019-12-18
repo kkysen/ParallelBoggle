@@ -4,32 +4,34 @@ module Main where
 
 import qualified Board
 import qualified Boggle
-import qualified Dictionary as Dict
+import qualified BoggleState
+import qualified Lang
 
 import Data.Function ((&))
 import Data.Maybe (fromJust)
 import System.Environment (getArgs)
+import System.Random (getStdGen)
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
 
 test :: IO ()
 test = do
-    dict <- Dict.fromFile "data/sowpods.txt"
+    lang <- Lang.fromFile "data/sowpods.txt"
     let board_ = ["SERS", "PATG", "LINE", "SERS"]
 --     let board_ = ["LIST", "FROM", "WORD", "HELL"]
 --    let board_ = ["AB", "CD"]
     let board = Board.fromList board_ & fromJust
     let boggle = Boggle.new board
     print board
-    let solution = Boggle.solve boggle dict
+    let solution = Boggle.solve boggle (Lang.dict lang)
     print solution
 
-main :: IO ()
-main = do
-    dict <- Dict.fromFile "data/sowpods.txt"
+userTest :: IO ()
+userTest = do
+    lang <- Lang.fromFile "data/sowpods.txt"
     args <- getArgs
-    let (board, score) = solve dict args
+    let (board, score) = solve (Lang.dict lang) args
     print board
     print score
   where
@@ -49,4 +51,32 @@ main = do
             & Boggle.new
             & (`Boggle.solve` dict)
             & Boggle.totalScore
-    
+
+randomTest :: IO ()
+randomTest = do
+    lang <- Lang.fromFile "data/sowpods.txt"
+    args <- getArgs
+    let [m, n, numBoards] = args & map read
+    [1..numBoards]
+        & map (\_ -> run (m, n) lang)
+        & sequence_
+  where
+    run size lang = do
+        state <- BoggleState.random size lang
+        state
+            & BoggleState.score
+            & print
+
+optimizeTest :: IO ()
+optimizeTest = do
+    lang <- Lang.fromFile "data/sowpods.txt"
+    args <- getArgs
+    let [m, n] = args & map read
+--     let (m, n) = (4, 4)
+    state <- BoggleState.optimize (m, n) lang
+    print $ BoggleState.board' state
+    print $ BoggleState.score state
+    print $ BoggleState.count state
+
+main :: IO ()
+main = optimizeTest

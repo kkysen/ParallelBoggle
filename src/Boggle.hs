@@ -10,16 +10,18 @@
 module Boggle (
     FoundWord,
     Solution,
+    Boggle,
+    Boggle.board,
     new,
     solve,
     totalScore
 ) where
 
 import Board (Board(..))
-import Dictionary (Dictionary)
+import Lang (Dict)
 
 import qualified Board
-import qualified Dictionary as Dict
+import qualified Lang as Dict
 
 import Control.Monad (guard)
 import Data.Bits (Bits, bit, setBit, testBit, bitSizeMaybe, shiftL, shiftR, (.&.), (.|.))
@@ -42,9 +44,9 @@ import qualified Data.Set as Set
 type IJ = Int -- (Int, Int) packed into one Int
 type PathElement = Int -- (Word8, IJ) packed into one Int
 type Neighbors = [PathElement]
-type BitSet = Word -- BitSet used as Bits BitSet
+type BitSet = Integer -- BitSet used as Bits BitSet
 type Path = ([PathElement], BitSet)
-type PathDictElement = (PathElement, BitSet, Dictionary)
+type PathDictElement = (PathElement, BitSet, Dict)
 
 data FoundWord = FoundWord {
     score :: Int,
@@ -62,7 +64,7 @@ instance Ord FoundWord where
 data Solution = Solution {
     words :: [FoundWord],
     totalScore :: Int,
-    board :: Board
+    board_ :: Board
 }
 
 -- length to score
@@ -79,11 +81,14 @@ data Boggle = Boggle {
     startingNeighbors :: Neighbors,
     neighborIndices :: IJ -> [IJ],
     neighbors :: IJ -> Neighbors,
-    searchIndices :: Dictionary -> BitSet -> [IJ] -> [Path],
+    searchIndices :: Dict -> BitSet -> [IJ] -> [Path],
     searchFrom :: PathDictElement -> [Path],
     toFoundWord :: Path -> FoundWord,
-    solve :: Dictionary -> Solution
+    solve :: Dict -> Solution
 }
+
+instance Show Boggle where
+    show Boggle {board} = show board
 
 newWithScorer :: Scorer -> Board -> Boggle
 newWithScorer scorer board = Boggle {
@@ -149,7 +154,7 @@ newWithScorer scorer board = Boggle {
       where
         (!i, !j) = fromIJ ij
     
-    searchIndices :: Dictionary -> BitSet -> [IJ] -> [Path]
+    searchIndices :: Dict -> BitSet -> [IJ] -> [Path]
     searchIndices subDict pathSet indices = indices
         & filter (not . (pathSet `testBit`))
         & toNeighbors
@@ -189,7 +194,7 @@ newWithScorer scorer board = Boggle {
         path = unPackedPath & map snd
         score = scorer $ BS.length word
     
-    solve dict = Solution {words, totalScore, board}
+    solve dict = Solution {words, totalScore, board_ = board}
       where
         words = startingNeighborIndices
             & searchIndices dict startingPathSet
@@ -233,17 +238,17 @@ instance Show PrettyFoundWords where
 data PrettySolution = PrettySolution {
     words :: PrettyFoundWords,
     totalScore_ :: Int,
-    board :: Board
+    board_ :: Board
 } deriving Show
 
 prettySolution :: Solution -> PrettySolution
-prettySolution Solution {words, totalScore, board} = PrettySolution {
+prettySolution Solution {words, totalScore, board_} = PrettySolution {
     words = words & map convert & PrettyFoundWords,
     totalScore_ = totalScore,
-    board
+    board_
 }
   where
-    (m, n) = Board.size board
+    (m, n) = Board.size board_
     convert FoundWord {score, word, path} = PrettyFoundWord {
         score_ = score,
         word_ = word,
@@ -252,10 +257,3 @@ prettySolution Solution {words, totalScore, board} = PrettySolution {
 
 instance Show Solution where
     show = show . prettySolution
-
-dict' = Dict.fromFile "data/sowpods.txt"
-
-boggle' = ["LIST", "FROM", "WORD", "HELL"]
-    & Board.fromList
-    & fromJust
-    & Boggle.new
