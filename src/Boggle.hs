@@ -23,7 +23,9 @@ import qualified Board
 import qualified Lang as Dict
 
 import Control.Monad (guard)
-import Data.Bits (Bits, bit, setBit, testBit, bitSizeMaybe, shiftL, shiftR, (.&.), (.|.))
+import Control.Parallel.Strategies (using, parList, rseq, rdeepseq)
+import Data.Bits (Bits, bit, setBit, testBit, bitSizeMaybe,
+    shiftL, shiftR, (.&.), (.|.), popCount)
 import Data.ByteString (ByteString)
 import Data.Function ((&))
 import Data.Functor ((<&>))
@@ -110,6 +112,8 @@ newWithScorer scorer board runInParallel = Boggle {
     
     Board {board = boardArray, size = (m, n)} = board
     
+    size = m * n
+    
     fromIJ :: IJ -> (Int, Int)
     fromIJ = (`divMod` m)
     
@@ -154,13 +158,27 @@ newWithScorer scorer board runInParallel = Boggle {
       where
         (!i, !j) = fromIJ ij
     
+    searchFrom :: PathDictElement -> [Path]
+    searchFrom (!pathElem, !pathSet, !subDict) = ij
+        & neighborIndices
+        & searchIndices subDict pathSet
+        & map (\(!path, !pathSet) -> (pathElem : path, pathSet)) -- TODO simplify
+      where
+        (!c, !ij) = fromPathElement pathElem
+    
     searchIndices :: Dict -> BitSet -> [IJ] -> [Path]
     searchIndices subDict pathSet indices = indices
         & filter (not . (pathSet `testBit`))
         & toNeighbors
         & map searchNeighbor
+        & parallelize
         & concat
       where
+        pathLength = popCount pathSet
+        parallelize = case pathLength <= 4 of
+            True -> (`using` parList rdeepseq)
+            False -> id
+        
         searchNeighbor :: PathElement -> [Path]
         searchNeighbor pathElem = currentPath ++ subPaths
           where
@@ -177,14 +195,6 @@ newWithScorer scorer board runInParallel = Boggle {
                 <&> (pathElem, pathSet `setBit` ij, )
                 <&> searchFrom
                 & fromMaybe []
-    
-    searchFrom :: PathDictElement -> [Path]
-    searchFrom (!pathElem, !pathSet, !subDict) = ij
-        & neighborIndices
-        & searchIndices subDict pathSet
-        & map (\(!path, !pathSet) -> (pathElem : path, pathSet)) -- TODO simplify
-      where
-        (!c, !ij) = fromPathElement pathElem
     
     toFoundWord :: Path -> FoundWord
     toFoundWord (!combinedPath, !pathSet) = FoundWord {word, pathSet, path, score}
@@ -257,3 +267,7 @@ prettySolution Solution {words, totalScore, board_} = PrettySolution {
 
 instance Show Solution where
     show = show . prettySolution
+
+dict' = Dict.fromFile "data/sowpods.txt" <&> Dict.dict
+board' = Board.fromList ["LIST", "FROM", "WORD", "HELL"] & fromJust
+boggle' = Boggle.new board' False

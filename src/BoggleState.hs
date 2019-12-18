@@ -1,6 +1,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 
 module BoggleState (
+    boggle,
     board',
     score,
     count,
