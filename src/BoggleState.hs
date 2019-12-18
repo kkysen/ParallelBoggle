@@ -68,7 +68,7 @@ instance SA.State BoggleState where
             boggle = Boggle.new $ modify board,
             count = count + 1
         }
-        return $ traceShowId $ s'
+        return $ s'
 
 random :: MonadRandom m => Size -> Lang -> m BoggleState
 random size@(m, n) lang = do

@@ -18,12 +18,12 @@ import qualified Metric
 
 import Prelude hiding (min)
 
-import Control.Monad.Random (runRand)
+import Control.Monad.Random (evalRand)
 import Control.Monad.Random.Class (MonadRandom, getRandom)
 import Data.Function ((&))
 import Data.Functor ((<&>))
 import Numeric.GSL.SimulatedAnnealing (SimulatedAnnealingParams(..), simanSolve)
-import Numeric.LinearAlgebra.Data (Vector)
+import Numeric.LinearAlgebra.Data (Vector, (!))
 import System.Random (mkStdGen, StdGen)
 
 import Debug.Trace
@@ -101,23 +101,28 @@ rawAnneal Annealer {
 anneal :: (State a, MonadRandom m) => a -> Args -> Maybe (a -> String) -> m a
 anneal initialState args maybeShow = do
     seed <- getRandom
-    seedG <- getRandom
     Annealer {
         seed,
-        numRandoms = 0,
+        numRandoms = 1,
         params = argsToParams args,
-        initialState = (initialState, mkStdGen seedG),
-        energy' = energy . fst,
-        metric' = Metric.by fst metric,
+        initialState,
+        energy' = energy,
+        metric' = metric,
         step,
-        maybeShow = maybeShow <&> (. fst)
+        maybeShow
     }
         & rawAnneal
-        & fst
         & return
       where
-        step _ stepSize (s, g) = runRand (perturb stepSize s) (traceShowId g)
         -- It's too hard to thread the monad through the SA,
         -- b/c the FFI library isn't designed with monads.
         -- So I'm doing it manually here, seeding a new StdGen using mkStdGen
         -- with a seed from the MonadRandom.
+        step vectors stepSize s = s'
+          where
+            seed = (vectors ! 0)
+                * (fromIntegral (maxBound :: Int))
+                & truncate
+            g = mkStdGen seed
+            rand = traceShow (g, seed) $ perturb stepSize s
+            s' = evalRand rand g
