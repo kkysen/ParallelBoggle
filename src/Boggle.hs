@@ -3,7 +3,6 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE UnboxedTuples #-}
 
@@ -33,7 +32,6 @@ import Data.Maybe (fromMaybe, maybeToList, fromJust)
 import Data.Monoid (mappend)
 import Data.Ord (comparing)
 import Data.Set (Set)
-import Data.String.Interpolate (i)
 import Data.Word (Word8)
 
 import Debug.Trace
@@ -72,6 +70,7 @@ data Solution = Solution {
 type Scorer = Int -> Int -- length to score
 
 data Boggle = Boggle {
+    parallel :: Bool,
     board :: Board,
     scorer :: Scorer,
     get :: IJ -> Word8,
@@ -90,8 +89,9 @@ data Boggle = Boggle {
 instance Show Boggle where
     show Boggle {board} = show board
 
-newWithScorer :: Scorer -> Board -> Boggle
-newWithScorer scorer board = Boggle {
+newWithScorer :: Scorer -> Board -> Bool -> Boggle
+newWithScorer scorer board runInParallel = Boggle {
+    parallel = runInParallel,
     board,
     scorer,
     get,
@@ -131,12 +131,12 @@ newWithScorer scorer board = Boggle {
     startingPathSet :: BitSet
     startingPathSet = 0
     
-    -- TODO assert this is Nothing
-    bitSetSizeCheck = do
-        bitSize <- bitSizeMaybe startingPathSet
-        guard $ bitSize > m * n
-        return [i|BitSet is not big enough for size #{(m, n)},
-            but this size is intractably large anyways.|]
+--    -- TODO assert this is Nothing
+--     bitSetSizeCheck = do
+--         bitSize <- bitSizeMaybe startingPathSet
+--         guard $ bitSize > m * n
+--         return [i|BitSet is not big enough for size #{(m, n)},
+--             but this size is intractably large anyways.|]
     
     prod s t = [(a, b) | a <- s, b <- t]
     
@@ -208,7 +208,7 @@ newWithScorer scorer board = Boggle {
             & map score
             & sum
 
-new :: Board -> Boggle
+new :: Board -> Bool -> Boggle
 new = newWithScorer scorer
   where
     scorer n

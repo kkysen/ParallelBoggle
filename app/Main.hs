@@ -22,7 +22,7 @@ test = do
 --     let board_ = ["LIST", "FROM", "WORD", "HELL"]
 --    let board_ = ["AB", "CD"]
     let board = Board.fromList board_ & fromJust
-    let boggle = Boggle.new board
+    let boggle = Boggle.new board False
     print board
     let solution = Boggle.solve boggle (Lang.dict lang)
     print solution
@@ -48,7 +48,7 @@ userTest = do
             & Board.fromList
             & fromJust
         score = board
-            & Boggle.new
+            & (`Boggle.new` False)
             & (`Boggle.solve` dict)
             & Boggle.totalScore
 
@@ -62,7 +62,7 @@ randomTest = do
         & sequence_
   where
     run size lang = do
-        state <- BoggleState.random size lang
+        state <- BoggleState.random size lang False
         state
             & BoggleState.score
             & print
@@ -73,7 +73,7 @@ optimizeTest = do
     args <- getArgs
     let [m, n] = args & map read
 --     let (m, n) = (4, 4)
-    state <- BoggleState.optimize (m, n) lang
+    state <- BoggleState.optimize (m, n) lang False
     print $ BoggleState.board' state
     print $ BoggleState.score state
     print $ BoggleState.count state

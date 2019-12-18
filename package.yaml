@@ -24,7 +24,6 @@ dependencies:
 - bytestring
 - bytestring-trie
 - containers
-- interpolate
 - random
 - mmap
 - hmatrix-gsl

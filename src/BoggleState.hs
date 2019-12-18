@@ -31,7 +31,8 @@ import Debug.Trace
 data BoggleState = BoggleState {
     boggle :: Boggle,
     lang :: Lang,
-    count :: Int
+    count :: Int,
+    parallel :: Bool
 }
 
 instance Show BoggleState where
@@ -57,7 +58,7 @@ instance SA.State BoggleState where
             | n > 0 = once s >>= multiple (n - 1)
             | otherwise = return s
         
-        once s@BoggleState {boggle, lang, count} = do
+        once s@BoggleState {boggle, lang, count, parallel} = do
             let board = Boggle.board boggle
             let (m, n) = Board.size board
             let size = m * n
@@ -71,23 +72,24 @@ instance SA.State BoggleState where
                     ij' <- getRandomR (0, size - 1)
                     return $ Board.swapLetters ij ij'
             let s' = s {
-                boggle = Boggle.new $ modify board,
+                boggle = Boggle.new (modify board) parallel,
                 count = count + 1
             }
             return $ s'
 
-random :: MonadRandom m => Size -> Lang -> m BoggleState
-random size@(m, n) lang = do
+random :: MonadRandom m => Size -> Lang -> Bool -> m BoggleState
+random size@(m, n) lang parallel = do
     board <- Lang.randomLetters lang (m * n)
     return $ BoggleState {
-        boggle = Boggle.new Board {board, size},
+        boggle = Boggle.new Board {board, size} parallel,
         lang,
-        count = 0
+        count = 0,
+        parallel
     }
 
-optimize :: MonadRandom m => Size -> Lang -> m BoggleState
-optimize size lang = do
-    state <- random size lang
+optimize :: MonadRandom m => Size -> Lang -> Bool -> m BoggleState
+optimize size lang parallel = do
+    state <- random size lang parallel
     let (m, n) = size
     let mn = m * n
     let args = Args {
