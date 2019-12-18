@@ -22,6 +22,7 @@ import Control.Monad.Random (evalRand)
 import Control.Monad.Random.Class (MonadRandom, getRandom)
 import Data.Function ((&))
 import Data.Functor ((<&>))
+import Data.Int (Int32)
 import Numeric.GSL.SimulatedAnnealing (SimulatedAnnealingParams(..), simanSolve)
 import Numeric.LinearAlgebra.Data (Vector, (!))
 import System.Random (mkStdGen, StdGen)
@@ -121,8 +122,8 @@ anneal initialState args maybeShow = do
         step vectors stepSize s = s'
           where
             seed = (vectors ! 0)
-                * (fromIntegral (maxBound :: Int))
+                * (fromIntegral (maxBound :: Int32))
                 & truncate
             g = mkStdGen seed
-            rand = traceShow (g, seed) $ perturb stepSize s
+            rand = perturb stepSize s
             s' = evalRand rand g
