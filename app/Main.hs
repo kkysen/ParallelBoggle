@@ -1,11 +1,16 @@
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Main where
+
+import SimulatedAnnealing (Args(..), CoolingTemp(..))
 
 import qualified Board
 import qualified Boggle
 import qualified BoggleState
 import qualified Lang
+
+import Prelude hiding (min)
 
 import Data.Function ((&))
 import Data.Maybe (fromJust)
@@ -71,9 +76,26 @@ optimizeTest :: IO ()
 optimizeTest = do
     lang <- Lang.fromFile "data/sowpods.txt"
     args <- getArgs
-    let [m, n] = args & map read
---     let (m, n) = (4, 4)
-    state <- BoggleState.optimize (m, n) lang False
+    let [m', n', numTries', numItersPerTemp', rate', min'] = args
+    let [m, n] = [m', n'] & map read
+    let [numTries, numItersPerTemp] = [numTries', numItersPerTemp'] & map read
+    let [rate, min] = [rate', min'] & map read
+    let args = Args {
+            numTries,
+            numItersPerTemp,
+--             numTries = 10,
+--             numItersPerTemp = 500,
+            maxStepSize = 1.0,
+            boltzmannK = 1.0,
+            coolingTemp = CoolingTemp {
+                initial = 1.0,
+                rate,
+                min
+--                 rate = 1.05,
+--                 min = 0.69
+            }
+    }
+    state <- BoggleState.optimize (m, n) lang args False
     print $ BoggleState.board' state
     print $ BoggleState.score state
     print $ BoggleState.count state

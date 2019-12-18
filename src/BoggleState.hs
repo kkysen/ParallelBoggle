@@ -87,20 +87,14 @@ random size@(m, n) lang parallel = do
         parallel
     }
 
-optimize :: MonadRandom m => Size -> Lang -> Bool -> m BoggleState
-optimize size lang parallel = do
+optimize :: MonadRandom m => Size -> Lang -> Args -> Bool -> m BoggleState
+optimize size lang args parallel = do
     state <- random size lang parallel
     let (m, n) = size
     let mn = m * n
-    let args = Args {
-        numTries = 10,
-        numItersPerTemp = 500,
-        maxStepSize = sqrt $ fromIntegral mn,
-        boltzmannK = 1.0,
-        coolingTemp = CoolingTemp {
-            initial = 1.0,
-            rate = 1.05,
-            min = 0.0069 --2.0e-6
-        }
+    let Args {maxStepSize} = args
+    let args' = args {
+        maxStepSize = maxStepSize * (sqrt $ fromIntegral mn),
+        boltzmannK = 1.0
     }
-    SA.anneal state args (Just $ show . count)
+    SA.anneal state args' (Just $ show . count)

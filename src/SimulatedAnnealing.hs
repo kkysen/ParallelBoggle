@@ -127,3 +127,7 @@ anneal initialState args maybeShow = do
             g = mkStdGen seed
             rand = perturb stepSize s
             s' = evalRand rand g
+
+realAnneal :: (State a, MonadRandom m) => a -> Args -> m a
+realAnneal initialState args = do
+    undefined
