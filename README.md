@@ -12,6 +12,9 @@ If you already have the source, it should also contain sample event logs (in `ev
 from different stages of development where I tried different methods of parallelism.
 A PDF of this README is also included in the repo.
 
+Besides the event logs, which are too large for GitHub,
+it's probably easier to just clone the repo.
+
 The project proposal, in LaTeX and PDF form,
 are in the `proposal/` directory, which explains the basis of the project.
 
