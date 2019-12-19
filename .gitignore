@@ -3,3 +3,5 @@ ParallelBoggle.cabal
 *~
 
 .idea/
+
+*.eventlog

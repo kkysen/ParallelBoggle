@@ -42,9 +42,6 @@ withSizes map = f
     f (Arc k (Just v) t) = (Arc k (Just $! map (n + 1) v) t', n + 1)
       where
         (t', n) = f t
---     f (Arc k v trie) = (Arc k (v <&> map (n + 1)) subTrie, n)
---       where
---         (subTrie, n) = f trie
     f (Branch p mask l r) = (Branch p mask l' r', m + n)
       where
         (l', m) = f l
@@ -91,12 +88,6 @@ startingWith = Trie.lookupBy (\exists subDict -> (
         exists <&> const (),
         Just subDict & mfilter (not . Trie.null)
     ))
-
--- randomRsState :: (RandomGen g, Random r) => (r, r) -> g ->
---
--- randomLetter' :: RandomGen g => State g Lang -> State g Word8
--- randomLetter' s = do
---     g <- get s
 
 randomLetters :: MonadRandom m => Lang -> Int -> m ByteString
 randomLetters Lang {bytes} n = getRandomRs (0, BS.length bytes - 1)

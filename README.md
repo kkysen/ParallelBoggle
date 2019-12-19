@@ -8,8 +8,9 @@ Project for COMS 4995 Parallel Functional Programming with Stephen Edwards.
 
 To run this, you can clone it from github if you don't already have it:  
     `git clone git@github.com:kkysen/ParallelBoggle.git`  
-If you already have the source, it should also contain sample event logs 
+If you already have the source, it should also contain sample event logs (in `eventlogs/`)
 from different stages of development where I tried different methods of parallelism.
+A PDF of this README is also included in the repo.
 
 The project proposal, in LaTeX and PDF form,
 are in the `proposal/` directory, which explains the basis of the project.
@@ -113,18 +114,21 @@ wasn't changing the boards at all.
 
 ### Parallelism
 
+Note: event logs for most of these tries are included in `eventlogs/`.
+The `N1` are the serial version and the `N8` are the parallel versions.
+
 I thought parallelizing the search algorithm would be fairly straightforward.
 I could just do some sort of a parallel map over 
 each of the neighboring letters I explore in the search.
-I could limit this to just the first round,
+I could limit this to just the first round (`Depth 1`),
 where I just search from all the letters on the board,
 which I thought would be enough parallelism.
-Or I could parallelize deeper and set a threshold beyond which
+Or I could parallelize deeper (`All Depths`) and set a threshold beyond which
 I stopped parallelizing the search.
 
 However, when I tried implementing the former idea,
 the parallelism actually slowed down the algorithm slightly with 8 logical cores.
-The latter idea fared a bit better, but not by much.
+The latter idea (`Path Lenght 3`) fared a bit better, but not by much.
 The threshold I used was how long the current word path was.
 But the parallel version only barely improved over the serial version.
 
@@ -191,7 +195,7 @@ or there is no leaf at the root,
 in which we have to iterate over the immediate branches,
 but there is a constant bound over the number of such branches.
 
-When I switched to using this `O(1)` version of `Trie.size`,
+When I switched to using this `O(1)` version of `Trie.size` (`Dict Size 10000 - 70x70`),
 the serial version went back to normal,
 but the parallel version didn't have a proportionate improvement.
 It still did better than before,
@@ -229,3 +233,254 @@ and introducing parallelism at the board level (not in the board),
 would've led to coarser-grained parallelism
 that would've left each spark much more work to do,
 resulting probably in a much better parallel speedup.
+
+### Code
+
+I'm not sure what is meant by including listings of all the code in the PDF.
+Although most of the core parallelism and search algorithm
+are in `src/Boggle.hs` in the `newWithScorer` function, 
+there are important parts spread across modules.
+It seems weird to include them all in this report
+instead of just viewing the files themselves.
+Nevertheless, here are some of the important parts of the code
+concerning the main algorithm and parallelism 
+(excluding simulated annealing and optimization):
+
+`Boggle.hs`:
+```haskell
+type IJ = Int -- (Int, Int) packed into one Int
+type PathElement = Int -- (Word8, IJ) packed into one Int
+type Neighbors = [PathElement]
+type BitSet = Integer -- BitSet used as Bits BitSet
+type Path = ([PathElement], BitSet)
+type PathDictElement = (PathElement, BitSet, Dict)
+
+data FoundWord = FoundWord {
+    score :: Int,
+    word :: ByteString,
+    pathSet :: BitSet,
+    path :: [IJ]
+}
+
+instance Eq FoundWord where
+    a == b = word a == word b
+
+instance Ord FoundWord where
+    a `compare` b = word a `compare` word b
+
+data Solution = Solution {
+    words :: [FoundWord],
+    totalScore :: Int,
+    board_ :: Board
+}
+
+type Scorer = Int -> Int -- length to score
+
+data Boggle = Boggle {
+    parallel :: Bool,
+    board :: Board,
+    scorer :: Scorer,
+    get :: IJ -> Word8,
+    toNeighbors :: [IJ] -> Neighbors,
+    startingPathSet :: BitSet,
+    startingNeighborIndices :: [IJ],
+    startingNeighbors :: Neighbors,
+    neighborIndices :: IJ -> [IJ],
+    neighbors :: IJ -> Neighbors,
+    searchFrom :: PathDictElement -> [Path],
+    searchIndices :: Dict -> BitSet -> [IJ] -> [Path],
+    toFoundWord :: Path -> FoundWord,
+    solve :: Lang -> Solution
+}
+
+newWithScorer :: Scorer -> Board -> Bool -> Boggle
+newWithScorer scorer board runInParallel = Boggle {
+    parallel = runInParallel,
+    board,
+    scorer,
+    get,
+    toNeighbors,
+    startingPathSet,
+    startingNeighborIndices,
+    startingNeighbors = toNeighbors $ startingNeighborIndices,
+    neighborIndices,
+    neighbors = toNeighbors . neighborIndices,
+    searchIndices,
+    searchFrom,
+    toFoundWord,
+    solve
+}
+  where
+    
+    Board {board = boardArray, size = (m, n)} = board
+    
+    size = m * n
+    
+    fromIJ :: IJ -> (Int, Int)
+    fromIJ = (`divMod` m)
+    
+    toIJ :: (Int, Int) -> IJ
+    toIJ (!i, !j) = i * n + j
+    
+    get :: IJ -> Word8
+    get ij = BS.index boardArray ij
+    
+    fromPathElement :: PathElement -> (Word8, IJ)
+    fromPathElement e = (fromIntegral e .&. 0xFF, e `shiftR` 8)
+    
+    toPathElement :: (Word8, IJ) -> PathElement
+    toPathElement (!c, !ij) = fromIntegral c .|. ij `shiftL` 8
+    
+    toNeighbors :: [IJ] -> Neighbors
+    toNeighbors = map (\ij -> toPathElement (get ij, ij))
+    
+    startingPathSet :: BitSet
+    startingPathSet = 0
+    
+    prod s t = [(a, b) | a <- s, b <- t]
+    
+    startingNeighborIndices = [0..(m - 1)] `prod` [0..(n - 1)]
+        & map toIJ
+    
+    indices = [-1..1] `prod` [-1..1]
+        & filter (/= (0, 0))
+    
+    neighborIndices :: IJ -> [IJ]
+    neighborIndices ij = indices
+        & map (\(!x, !y) -> (i + x, j + y))
+        & filter (\(!i, !j) -> i >= 0 && i < m && j >= 0 && j < n)
+        & map toIJ
+      where
+        (!i, !j) = fromIJ ij
+    
+    searchFrom :: PathDictElement -> [Path]
+    searchFrom (!pathElem, !pathSet, !subDict) = ij
+        & neighborIndices
+        & searchIndices subDict pathSet
+        & map (\(!path, !pathSet) -> (pathElem : path, pathSet)) -- TODO simplify
+      where
+        (!c, !ij) = fromPathElement pathElem
+    
+    searchIndices :: Dict -> BitSet -> [IJ] -> [Path]
+    searchIndices subDict pathSet indices = indices
+        & filter (not . (pathSet `testBit`))
+        & toNeighbors
+        & map searchNeighbor
+        & parallelize
+        & concat
+      where
+        -- only use parallelism when the subDict is large enough
+        -- since a large subDict implies there's a lot more search work to do
+        parallelize = case Dict.size subDict > 5000 of
+            True -> (`using` parList rdeepseq)
+            False -> id
+        
+        searchNeighbor :: PathElement -> [Path]
+        searchNeighbor pathElem = currentPath ++ subPaths
+          where
+            (!c, !ij) = fromPathElement pathElem
+            (found, maybeSubDict) = Dict.startingWith (BS.singleton c) subDict
+            
+            currentPath :: [Path]
+            currentPath = found
+                <&> const ([pathElem], pathSet)
+                & maybeToList
+            
+            subPaths :: [Path]
+            subPaths = maybeSubDict
+                <&> (pathElem, pathSet `setBit` ij, )
+                <&> searchFrom
+                & fromMaybe []
+    
+    toFoundWord :: Path -> FoundWord
+    toFoundWord (!combinedPath, !pathSet) = FoundWord {word, pathSet, path, score}
+      where
+        unPackedPath = combinedPath & map fromPathElement
+        word = unPackedPath & map fst & BS.pack
+        path = unPackedPath & map snd
+        score = scorer $ BS.length word
+    
+    solve :: Lang -> Solution
+    solve Lang {dict, dictSize} = Solution {words, totalScore, board_ = board}
+      where
+        words = startingNeighborIndices
+            & searchIndices dict startingPathSet
+            & map toFoundWord
+            & filter ((> 0) . score)
+            & Set.fromList
+            & Set.toList
+            & sortBy cmp
+        cmp = (comparing (BS.length . word)) `mappend` (comparing word)
+        totalScore = words
+            & map score
+            & sum
+
+new :: Board -> Bool -> Boggle
+new = newWithScorer scorer
+  where
+    scorer n
+        | n < 3 = 0
+        | n == 3 = 1
+        | n == 4 = 1
+        | n == 5 = 2
+        | n == 6 = 3
+        | n == 7 = 5
+        | n > 7 = 11
+```
+
+`Lang.hs`
+```haskell
+withSizes :: (Int -> a -> b) -> Trie a -> (Trie b, Int)
+withSizes map = f
+  where
+    f Empty = (Empty, 0)
+    f (Arc k Nothing t) = (Arc k Nothing t', n)
+      where
+        (t', n) = f t
+    f (Arc k (Just v) t) = (Arc k (Just $! map (n + 1) v) t', n + 1)
+      where
+        (t', n) = f t
+    f (Branch p mask l r) = (Branch p mask l' r', m + n)
+      where
+        (l', m) = f l
+        (r', n) = f r
+
+ofSizes :: Trie a -> (Trie Int, Int)
+ofSizes = withSizes (\n _ -> n)
+
+type Dict = Trie Int
+
+data Lang = Lang {
+    dict :: Dict,
+    dictSize :: Int,
+    bytes :: ByteString
+}
+
+fromWords :: ByteString -> Lang
+fromWords bytes = Lang {dict, dictSize, bytes}
+  where
+    (dict, dictSize) = bytes
+        & CBS.split '\n'
+        & map (, ())
+        & Trie.fromList
+        & ofSizes
+
+fromFile :: FilePath -> IO Lang
+fromFile path = mmapFileByteString path Nothing
+    <&> fromWords
+
+size :: Dict -> Int
+size = f
+  where
+    f Empty = 0
+    f (Arc _ Nothing t) = f t
+    f (Arc _ (Just n) _) = n
+    f (Branch _ _ l r) = (f l) + (f r)
+
+startingWith :: ByteString -> Dict -> (Maybe (), Maybe Dict)
+startingWith = Trie.lookupBy (\exists subDict -> (
+        exists <&> const (),
+        Just subDict & mfilter (not . Trie.null)
+    ))
+```
+

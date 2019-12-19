@@ -136,13 +136,6 @@ newWithScorer scorer board runInParallel = Boggle {
     startingPathSet :: BitSet
     startingPathSet = 0
     
---    -- TODO assert this is Nothing
---     bitSetSizeCheck = do
---         bitSize <- bitSizeMaybe startingPathSet
---         guard $ bitSize > m * n
---         return [i|BitSet is not big enough for size #{(m, n)},
---             but this size is intractably large anyways.|]
-    
     prod s t = [(a, b) | a <- s, b <- t]
     
     startingNeighborIndices = [0..(m - 1)] `prod` [0..(n - 1)]
@@ -177,7 +170,7 @@ newWithScorer scorer board runInParallel = Boggle {
       where
         -- only use parallelism when the subDict is large enough
         -- since a large subDict implies there's a lot more search work to do
-        parallelize = case Dict.size subDict > 5000 of
+        parallelize = case Dict.size subDict > 10000 of
             True -> (`using` parList rdeepseq)
             False -> id
         
@@ -271,6 +264,6 @@ prettySolution Solution {words, totalScore, board_} = PrettySolution {
 instance Show Solution where
     show = show . prettySolution
 
-dict' = Dict.fromFile "data/sowpods.txt" <&> Dict.dict
-board' = Board.fromList ["LIST", "FROM", "WORD", "HELL"] & fromJust
-boggle' = Boggle.new board' False
+-- dict' = Dict.fromFile "data/sowpods.txt" <&> Dict.dict
+-- board' = Board.fromList ["LIST", "FROM", "WORD", "HELL"] & fromJust
+-- boggle' = Boggle.new board' False
