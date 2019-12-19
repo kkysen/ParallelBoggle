@@ -43,7 +43,7 @@ board' :: BoggleState -> Board
 board' = Boggle.board . boggle
 
 score :: BoggleState -> Int
-score BoggleState {boggle, lang} = Boggle.solve boggle (Lang.dict lang)
+score BoggleState {boggle, lang} = Boggle.solve boggle lang
     & Boggle.totalScore
 
 instance MetricSpace BoggleState where

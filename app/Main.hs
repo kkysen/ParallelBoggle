@@ -29,14 +29,14 @@ test = do
     let board = Board.fromList board_ & fromJust
     let boggle = Boggle.new board False
     print board
-    let solution = Boggle.solve boggle (Lang.dict lang)
+    let solution = Boggle.solve boggle lang
     print solution
 
 userTest :: IO ()
 userTest = do
     lang <- Lang.fromFile "data/sowpods.txt"
     args <- getArgs
-    let (board, score) = solve (Lang.dict lang) args
+    let (board, score) = solve lang args
     print board
     print score
   where
@@ -45,7 +45,7 @@ userTest = do
     grow 0 args = args
     grow n args = (args ++ args) & map (\s -> s ++ s) & grow (n - 1)
     
-    solve dict args = (board, score)
+    solve lang args = (board, score)
       where
         board = args
             & grow 3
@@ -54,7 +54,7 @@ userTest = do
             & fromJust
         score = board
             & (`Boggle.new` False)
-            & (`Boggle.solve` dict)
+            & (`Boggle.solve` lang)
             & Boggle.totalScore
 
 randomTest :: IO ()

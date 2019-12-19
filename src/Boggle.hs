@@ -17,7 +17,7 @@ module Boggle (
 ) where
 
 import Board (Board(..))
-import Lang (Dict)
+import Lang (Lang(..), Dict)
 
 import qualified Board
 import qualified Lang as Dict
@@ -83,10 +83,10 @@ data Boggle = Boggle {
     startingNeighbors :: Neighbors,
     neighborIndices :: IJ -> [IJ],
     neighbors :: IJ -> Neighbors,
-    searchIndices :: Dict -> BitSet -> [IJ] -> [Path],
     searchFrom :: PathDictElement -> [Path],
+    searchIndices :: Dict -> BitSet -> [IJ] -> [Path],
     toFoundWord :: Path -> FoundWord,
-    solve :: Dict -> Solution
+    solve :: Lang -> Solution
 }
 
 instance Show Boggle where
@@ -175,10 +175,12 @@ newWithScorer scorer board runInParallel = Boggle {
         & parallelize
         & concat
       where
-        parallelize = case Trie.size subDict > 10000 of
+        -- only use parallelism when the subDict is large enough
+        -- since a large subDict implies there's a lot more search work to do
+        parallelize = case Dict.size subDict > 5000 of
             True -> (`using` parList rdeepseq)
             False -> id
-            
+        
         searchNeighbor :: PathElement -> [Path]
         searchNeighbor pathElem = currentPath ++ subPaths
           where
@@ -204,7 +206,8 @@ newWithScorer scorer board runInParallel = Boggle {
         path = unPackedPath & map snd
         score = scorer $ BS.length word
     
-    solve dict = Solution {words, totalScore, board_ = board}
+    solve :: Lang -> Solution
+    solve Lang {dict, dictSize} = Solution {words, totalScore, board_ = board}
       where
         words = startingNeighborIndices
             & searchIndices dict startingPathSet
